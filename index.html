@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="version" content="1.0.0">
+    <meta name="gs-app-id" content="edutrack">
+    <meta name="theme-color" content="#4ECDC4">
+    <meta name="description" content="Document tracking for special education teachers">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EduTrack">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- Manifest & Icons -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    
+    <title>EduTrack</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --bg-hover: #1f4068;
+            --text-primary: #ffffff;
+            --text-secondary: #a0b4c8;
+            --text-muted: #607080;
+            --border: #2a3f5f;
+            --accent-teal: #4ECDC4;
+            --accent-blue: #45B7D1;
+            --accent-green: #96CEB4;
+            --accent-red: #FF6B6B;
+            --accent-orange: #FFB347;
+            --accent-purple: #BB8FCE;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        
+        body {
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        
+        /* Screens */
+        .screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .screen.active {
+            display: flex;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: calc(var(--safe-top) + 12px) 16px 12px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-icon {
+            font-size: 1.8rem;
+        }
+        
+        .header-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        
+        .header-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        
+        .header-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 10px;
+            touch-action: manipulation;
+            color: var(--text-primary);
+        }
+        
+        /* Content Area */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px;
+            padding-bottom: calc(var(--safe-bottom) + 20px);
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: calc(var(--safe-top) + 20px);
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            z-index: 9999;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            white-space: nowrap;
+            transition: transform 0.3s ease;
+            pointer-events: none;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        .toast.success { background: var(--accent-teal); color: #1a1a2e; }
+        .toast.error { background: var(--accent-red); color: white; }
+        .toast.warning { background: var(--accent-orange); color: #1a1a2e; }
+        
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, var(--accent-teal), var(--accent-blue));
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            touch-action: manipulation;
+        }
+        
+        .btn-secondary {
+            padding: 14px 24px;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            touch-action: manipulation;
+        }
+        
+        .btn-danger {
+            width: 100%;
+            padding: 14px 24px;
+            border-radius: 12px;
+            border: none;
+            background: rgba(255,107,107,0.2);
+            color: var(--accent-red);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        /* Form Elements */
+        .label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            margin-top: 16px;
+        }
+        
+        .input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+        }
+        
+        .input:focus {
+            border-color: var(--accent-teal);
+        }
+        
+        .select {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0b4c8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+        }
+        
+        /* Chips */
+        .chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .chip {
+            padding: 10px 16px;
+            border-radius: 50px;
+            border: 2px solid rgba(255,255,255,0.15);
+            background: transparent;
+            color: #fff;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+        
+        .chip.active {
+            background: var(--accent-teal);
+            border-color: var(--accent-teal);
+            color: #1a1a2e;
+            font-weight: 600;
+        }
+        
+        /* Cards */
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .student-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .student-dot-lg {
+            width: 24px;
+            height: 24px;
+        }
+        
+        /* ============ SPLASH SCREEN ============ */
+        #splash-screen {
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .splash-logo {
+            font-size: 80px;
+            margin-bottom: 16px;
+        }
+        
+        .splash-title {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 0;
+            background: linear-gradient(135deg, var(--accent-teal), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .splash-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+        
+        .splash-features {
+            text-align: left;
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 32px;
+            max-width: 320px;
+        }
+        
+        .feature-item {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 1rem;
+        }
+        
+        .feature-item:last-child {
+            border-bottom: none;
+        }
+        
+        /* ============ SETUP WIZARD ============ */
+        #setup-screen {
+            align-items: center;
+            padding-top: calc(var(--safe-top) + 40px);
+        }
+        
+        .setup-progress {
+            display: flex;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        
+        .progress-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .progress-dot.active {
+            background: var(--accent-teal);
+        }
+        
+        .progress-line {
+            width: 60px;
+            height: 2px;
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .setup-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 24px;
+            padding: 32px;
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid var(--border);
+        }
+        
+        .setup-title {
+            font-size: 1.6rem;
+            margin: 0 0 8px;
+            text-align: center;
+        }
+        
+        .setup-desc {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .add-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .add-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            border: none;
+            background: var(--accent-teal);
+            color: #fff;
+            font-size: 1.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        
+        .student-list {
+            max-height: 280px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+        
+        .student-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .student-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .student-name {
+            font-weight: 600;
+        }
+        
+        .student-code {
+            font-size: 0.8rem;
+            color: var(--accent-teal);
+            font-family: monospace;
+        }
+        
+        .code-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        
+        .code-text {
+            background: rgba(78,205,196,0.2);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--accent-teal);
+            font-family: monospace;
+        }
+        
+        .copy-btn {
+            background: none;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 4px;
+        }
+        
+        .remove-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255,107,107,0.2);
+            color: var(--accent-red);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+        
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .btn-row .btn-secondary,
+        .btn-row .btn-primary {
+            flex: 1;
+        }
+        
+        .editable-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50px;
+            font-size: 0.9rem;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .chip-remove {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.5);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 4px;
+        }
+        
+        .chip-input {
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px dashed rgba(255,255,255,0.2);
+            border-radius: 50px;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+            min-width: 120px;
+            font-family: inherit;
+        }
+        
+        /* ============ HOME SCREEN ============ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-teal), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        
+        .capture-btn {
+            width: 100%;
+            padding: 20px;
+            border-radius: 16px;
+            border: none;
+            background: linear-gradient(135deg, var(--accent-teal), var(--accent-blue));
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 8px 32px rgba(78, 205, 196, 0.3);
+            font-family: inherit;
+            touch-action: manipulation;
+        }
+        
+        .capture-icon {
+            font-size: 1.5rem;
+        }
+        
+        .repo-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            font-family: inherit;
+            touch-action: manipulation;
+        }
+        
+        .repo-count {
+            margin-left: auto;
+            background: rgba(78,205,196,0.2);
+            color: var(--accent-teal);
+            padding: 4px 12px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        
+        .section {
+            margin-bottom: 28px;
+        }
+        
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        
+        .section-hint {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: -8px;
+            margin-bottom: 12px;
+        }
+        
+        .activity-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .activity-info {
+            flex: 1;
+        }
+        
+        .activity-name {
+            font-weight: 600;
+        }
+        
+        .activity-meta {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .activity-time {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        .code-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        .code-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .code-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .code-card-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .code-card-code {
+            font-size: 0.7rem;
+            color: var(--accent-teal);
+            font-family: monospace;
+        }
+        
+        .copy-icon {
+            font-size: 1rem;
+            opacity: 0.6;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 32px;
+            color: var(--text-muted);
+        }
+        
+        .empty-hint {
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+        
+        /* ============ PAGE HEADER ============ */
+        .page-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: calc(var(--safe-top) + 12px) 16px 12px;
+            background: rgba(0,0,0,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+        
+        .back-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 8px 0;
+            font-family: inherit;
+        }
+        
+        .page-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        
+        /* ============ CONFIG SCREEN ============ */
+        .config-section {
+            margin-bottom: 32px;
+        }
+        
+        .config-section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--accent-teal);
+        }
+        
+        .config-student-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .danger-zone {
+            margin-top: 48px;
+            padding: 20px;
+            background: rgba(255,107,107,0.1);
+            border-radius: 16px;
+            border: 1px solid rgba(255,107,107,0.3);
+        }
+        
+        .danger-title {
+            margin: 0 0 16px;
+            font-size: 1rem;
+            color: var(--accent-red);
+        }
+        
+        /* ============ CAPTURE SCREEN ============ */
+        #capture-screen {
+            background: #000;
+        }
+        
+        .camera-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .camera-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .camera-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        
+        .scan-frame {
+            width: 85%;
+            max-width: 350px;
+            aspect-ratio: 4/3;
+            position: relative;
+        }
+        
+        .corner {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+        }
+        
+        .corner-tl { top: 0; left: 0; border-top: 4px solid var(--accent-teal); border-left: 4px solid var(--accent-teal); border-radius: 8px 0 0 0; }
+        .corner-tr { top: 0; right: 0; border-top: 4px solid var(--accent-teal); border-right: 4px solid var(--accent-teal); border-radius: 0 8px 0 0; }
+        .corner-bl { bottom: 0; left: 0; border-bottom: 4px solid var(--accent-teal); border-left: 4px solid var(--accent-teal); border-radius: 0 0 0 8px; }
+        .corner-br { bottom: 0; right: 0; border-bottom: 4px solid var(--accent-teal); border-right: 4px solid var(--accent-teal); border-radius: 0 0 8px 0; }
+        
+        .scan-hint {
+            margin-top: 24px;
+            color: #fff;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        
+        .scan-hint-small {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+        
+        .shutter-btn {
+            position: absolute;
+            bottom: calc(var(--safe-bottom) + 40px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            border: 5px solid #fff;
+            background: transparent;
+            padding: 5px;
+            cursor: pointer;
+            pointer-events: auto;
+            touch-action: manipulation;
+        }
+        
+        .shutter-inner {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform 0.1s;
+        }
+        
+        .shutter-btn:active .shutter-inner {
+            transform: scale(0.9);
+        }
+        
+        .review-container {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            overflow-y: auto;
+        }
+        
+        .preview-container {
+            position: relative;
+        }
+        
+        .preview-image {
+            width: 100%;
+            display: block;
+        }
+        
+        .ocr-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top-color: var(--accent-teal);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .form-section {
+            padding: 20px;
+        }
+        
+        .detected-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(78,205,196,0.2);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(78,205,196,0.3);
+        }
+        
+        .check-mark {
+            font-size: 1.8rem;
+            color: var(--accent-teal);
+        }
+        
+        .detected-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        
+        .detected-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        
+        .warning-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(255,179,71,0.2);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,179,71,0.3);
+        }
+        
+        /* ============ REPOSITORY SCREEN ============ */
+        .filter-section {
+            padding: 16px;
+            background: rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .filter-select {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+        
+        .filter-date {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        
+        .result-count {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+        
+        .doc-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        
+        .doc-card {
+            display: flex;
+            gap: 14px;
+            padding: 14px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 14px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .doc-card.selected {
+            border-color: var(--accent-teal);
+        }
+        
+        .doc-thumb {
+            width: 72px;
+            height: 72px;
+            object-fit: cover;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        
+        .doc-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .doc-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .doc-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        
+        .doc-meta {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .doc-date {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        .doc-notes {
+            font-size: 0.85rem;
+            color: var(--accent-teal);
+            margin-top: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* ============ MODAL ============ */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: var(--bg-primary);
+            border-radius: 20px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: auto;
+            position: relative;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 10;
+        }
+        
+        .modal-image {
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+        }
+        
+        .modal-info {
+            padding: 20px;
+        }
+        
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .modal-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        
+        .modal-code {
+            font-size: 0.85rem;
+            color: var(--accent-teal);
+            font-family: monospace;
+        }
+        
+        .modal-details {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .modal-detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .modal-detail-row:last-child {
+            border-bottom: none;
+        }
+        
+        .modal-label {
+            color: var(--text-secondary);
+        }
+        
+        .delete-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            background: rgba(255,107,107,0.2);
+            color: var(--accent-red);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        /* ============ SYNC STATUS ============ */
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            font-size: 0.8rem;
+        }
+        
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .sync-dot.synced { background: var(--accent-green); }
+        .sync-dot.pending { background: var(--accent-orange); }
+        .sync-dot.offline { background: var(--accent-red); }
+        
+        /* Hidden canvas for image capture */
+        #capture-canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Hidden canvas for capture -->
+    <canvas id="capture-canvas"></canvas>
+    
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+    
+    <!-- ============ SPLASH SCREEN ============ -->
+    <div id="splash-screen" class="screen active">
+        <div class="splash-logo">📚</div>
+        <h1 class="splash-title">EduTrack</h1>
+        <p class="splash-subtitle">Document tracking for special education</p>
+        <div class="splash-features">
+            <div class="feature-item">📷 Capture student work</div>
+            <div class="feature-item">🔍 Auto-detect student codes</div>
+            <div class="feature-item">📁 Organize by student & subject</div>
+            <div class="feature-item">☁️ Cloud sync across devices</div>
+        </div>
+        <button class="btn-primary" onclick="startSetup()" style="max-width: 320px;">Get Started</button>
+    </div>
+    
+    <!-- ============ SETUP SCREEN ============ -->
+    <div id="setup-screen" class="screen">
+        <div class="content" style="display: flex; flex-direction: column; align-items: center;">
+            <div class="setup-progress">
+                <div id="progress-1" class="progress-dot active"></div>
+                <div class="progress-line"></div>
+                <div id="progress-2" class="progress-dot"></div>
+                <div class="progress-line"></div>
+                <div id="progress-3" class="progress-dot"></div>
+            </div>
+            
+            <!-- Step 1 -->
+            <div id="setup-step-1" class="setup-card">
+                <h2 class="setup-title">👋 Welcome!</h2>
+                <p class="setup-desc">Let's set up your classroom</p>
+                
+                <label class="label">Your Name</label>
+                <input type="text" id="teacher-name-input" class="input" placeholder="Mrs. Johnson">
+                
+                <label class="label">Classroom Name</label>
+                <input type="text" id="classroom-name-input" class="input" placeholder="Room 204 - Life Skills">
+                
+                <button class="btn-primary" onclick="goToSetupStep(2)" style="margin-top: 24px;">Continue</button>
+            </div>
+            
+            <!-- Step 2 -->
+            <div id="setup-step-2" class="setup-card" style="display: none;">
+                <h2 class="setup-title">👨‍🎓 Add Students</h2>
+                <p class="setup-desc">Each student gets a unique tracking code</p>
+                
+                <div class="add-row">
+                    <input type="text" id="new-first-name" class="input" placeholder="First name" style="flex: 1;">
+                    <input type="text" id="new-last-name" class="input" placeholder="Last name" style="flex: 1;">
+                    <button class="add-btn" onclick="addStudent()">+</button>
+                </div>
+                
+                <div id="student-list" class="student-list"></div>
+                
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="goToSetupStep(1)">Back</button>
+                    <button class="btn-primary" onclick="goToSetupStep(3)">Continue</button>
+                </div>
+            </div>
+            
+            <!-- Step 3 -->
+            <div id="setup-step-3" class="setup-card" style="display: none;">
+                <h2 class="setup-title">📝 Subjects & Periods</h2>
+                <p class="setup-desc">Customize for your classroom</p>
+                
+                <label class="label">Subjects</label>
+                <div id="subjects-container"></div>
+                <input type="text" class="chip-input" placeholder="+ Add subject" onkeydown="addSubject(event)">
+                
+                <label class="label" style="margin-top: 20px;">Periods</label>
+                <div id="periods-container"></div>
+                <input type="text" class="chip-input" placeholder="+ Add period" onkeydown="addPeriod(event)">
+                
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="goToSetupStep(2)">Back</button>
+                    <button class="btn-primary" onclick="finishSetup()">Finish Setup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============ HOME SCREEN ============ -->
+    <div id="home-screen" class="screen">
+        <div class="header">
+            <div class="header-left">
+                <span class="header-icon">📚</span>
+                <div>
+                    <div class="header-title" id="home-classroom-name">Classroom</div>
+                    <div class="header-subtitle" id="home-teacher-name">Teacher</div>
+                </div>
+            </div>
+            <button class="header-btn" onclick="showScreen('config')">⚙️</button>
+        </div>
+        
+        <div class="content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-today">0</div>
+                    <div class="stat-label">Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-total">0</div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-students">0</div>
+                    <div class="stat-label">Students</div>
+                </div>
+            </div>
+            
+            <button class="capture-btn" onclick="startCapture()">
+                <span class="capture-icon">📷</span>
+                <span>Capture Document</span>
+            </button>
+            
+            <button class="repo-btn" onclick="showScreen('repository')">
+                <span>📁</span>
+                <span>Document Repository</span>
+                <span class="repo-count" id="repo-count">0</span>
+            </button>
+            
+            <div class="section">
+                <h3 class="section-title">Recent Activity</h3>
+                <div id="recent-activity"></div>
+            </div>
+            
+            <div class="section">
+                <h3 class="section-title">Student Codes</h3>
+                <p class="section-hint">Tap to copy - use in Gemini or other tools</p>
+                <div class="code-grid" id="student-codes"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============ CONFIG SCREEN ============ -->
+    <div id="config-screen" class="screen">
+        <div class="page-header">
+            <button class="back-btn" onclick="showScreen('home')">← Back</button>
+            <span class="page-title">Settings</span>
+        </div>
+        
+        <div class="content">
+            <div class="config-section">
+                <h3 class="config-section-title">Classroom Info</h3>
+                <label class="label">Teacher Name</label>
+                <input type="text" id="config-teacher-name" class="input" onchange="updateConfig()">
+                <label class="label">Classroom Name</label>
+                <input type="text" id="config-classroom-name" class="input" onchange="updateConfig()">
+            </div>
+            
+            <div class="config-section">
+                <h3 class="config-section-title">Students</h3>
+                <div class="add-row">
+                    <input type="text" id="config-new-first" class="input" placeholder="First" style="flex: 1;">
+                    <input type="text" id="config-new-last" class="input" placeholder="Last" style="flex: 1;">
+                    <button class="add-btn" onclick="addStudentFromConfig()">+</button>
+                </div>
+                <div id="config-student-list"></div>
+            </div>
+            
+            <div class="config-section">
+                <h3 class="config-section-title">Subjects</h3>
+                <div id="config-subjects"></div>
+                <input type="text" class="input" placeholder="Add new subject..." onkeydown="addSubjectFromConfig(event)" style="margin-top: 12px;">
+            </div>
+            
+            <div class="config-section">
+                <h3 class="config-section-title">Periods</h3>
+                <div id="config-periods"></div>
+                <input type="text" class="input" placeholder="Add new period..." onkeydown="addPeriodFromConfig(event)" style="margin-top: 12px;">
+            </div>
+            
+            <div class="config-section">
+                <h3 class="config-section-title">Sync Status</h3>
+                <div class="sync-status">
+                    <div class="sync-dot" id="sync-dot"></div>
+                    <span id="sync-status-text">Checking...</span>
+                </div>
+            </div>
+            
+            <div class="danger-zone">
+                <h3 class="danger-title">⚠️ Danger Zone</h3>
+                <button class="btn-danger" onclick="resetAllData()">Reset All Data</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============ CAPTURE SCREEN ============ -->
+    <div id="capture-screen" class="screen">
+        <div class="page-header">
+            <button class="back-btn" onclick="cancelCapture()">← Cancel</button>
+            <span class="page-title">Capture Document</span>
+        </div>
+        
+        <div id="camera-view" class="camera-container">
+            <video id="camera-video" class="camera-video" playsinline muted></video>
+            <div class="camera-overlay">
+                <div class="scan-frame">
+                    <div class="corner corner-tl"></div>
+                    <div class="corner corner-tr"></div>
+                    <div class="corner corner-bl"></div>
+                    <div class="corner corner-br"></div>
+                </div>
+                <p class="scan-hint">Position document with code visible</p>
+                <p class="scan-hint-small">Code format: ET-XX-000</p>
+            </div>
+            <button class="shutter-btn" onclick="capturePhoto()">
+                <div class="shutter-inner"></div>
+            </button>
+        </div>
+        
+        <div id="review-view" class="review-container" style="display: none;">
+            <div class="preview-container">
+                <img id="preview-image" class="preview-image" src="" alt="Captured">
+                <div id="ocr-overlay" class="ocr-overlay" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Scanning for student code...</p>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <div id="detected-banner" class="detected-banner" style="display: none;">
+                    <span class="check-mark">✓</span>
+                    <div>
+                        <div class="detected-label">Detected Student</div>
+                        <div class="detected-name" id="detected-name"></div>
+                    </div>
+                </div>
+                
+                <div id="warning-banner" class="warning-banner" style="display: none;">
+                    <span>⚠️</span>
+                    <span>No code detected - select student manually</span>
+                </div>
+                
+                <label class="label">Student</label>
+                <select id="student-select" class="select">
+                    <option value="">Select student...</option>
+                </select>
+                
+                <label class="label">Subject *</label>
+                <div id="subject-chips" class="chip-row"></div>
+                
+                <label class="label">Document Type *</label>
+                <div id="doctype-chips" class="chip-row"></div>
+                
+                <label class="label">Period (optional)</label>
+                <div id="period-chips" class="chip-row"></div>
+                
+                <label class="label">Notes (optional)</label>
+                <input type="text" id="doc-notes" class="input" placeholder="Any notes about this document...">
+                
+                <div class="btn-row">
+                    <button class="btn-secondary" onclick="retakePhoto()">Retake</button>
+                    <button class="btn-primary" onclick="saveDocument()">Save Document</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============ REPOSITORY SCREEN ============ -->
+    <div id="repository-screen" class="screen">
+        <div class="page-header">
+            <button class="back-btn" onclick="showScreen('home')">← Back</button>
+            <span class="page-title">Document Repository</span>
+        </div>
+        
+        <div class="filter-section">
+            <div class="filter-row">
+                <select id="filter-student" class="filter-select" onchange="filterDocuments()">
+                    <option value="all">All Students</option>
+                </select>
+                <select id="filter-subject" class="filter-select" onchange="filterDocuments()">
+                    <option value="all">All Subjects</option>
+                </select>
+            </div>
+            <div class="filter-row">
+                <select id="filter-period" class="filter-select" onchange="filterDocuments()">
+                    <option value="all">All Periods</option>
+                </select>
+                <input type="date" id="filter-date-from" class="filter-date" onchange="filterDocuments()">
+                <input type="date" id="filter-date-to" class="filter-date" onchange="filterDocuments()">
+            </div>
+            <input type="text" id="search-text" class="search-input" placeholder="🔍 Search by name or notes..." oninput="filterDocuments()">
+            <div class="result-count"><span id="result-count">0</span> documents found</div>
+        </div>
+        
+        <div id="doc-list" class="doc-list"></div>
+    </div>
+    
+    <!-- ============ DOCUMENT MODAL ============ -->
+    <div id="doc-modal" class="modal-overlay" onclick="closeDocModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeDocModal()">×</button>
+            <img id="modal-image" class="modal-image" src="" alt="">
+            <div class="modal-info">
+                <div class="modal-header">
+                    <div id="modal-dot" class="student-dot student-dot-lg"></div>
+                    <div>
+                        <div class="modal-name" id="modal-name"></div>
+                        <div class="modal-code" id="modal-code"></div>
+                    </div>
+                </div>
+                <div class="modal-details">
+                    <div class="modal-detail-row">
+                        <span class="modal-label">Subject:</span>
+                        <span id="modal-subject"></span>
+                    </div>
+                    <div class="modal-detail-row">
+                        <span class="modal-label">Type:</span>
+                        <span id="modal-doctype"></span>
+                    </div>
+                    <div class="modal-detail-row">
+                        <span class="modal-label">Period:</span>
+                        <span id="modal-period"></span>
+                    </div>
+                    <div class="modal-detail-row">
+                        <span class="modal-label">Captured:</span>
+                        <span id="modal-date"></span>
+                    </div>
+                    <div class="modal-detail-row" id="modal-notes-row" style="display: none;">
+                        <span class="modal-label">Notes:</span>
+                        <span id="modal-notes"></span>
+                    </div>
+                </div>
+                <button class="delete-btn" onclick="deleteDocument()">🗑️ Delete Document</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ============ FIREBASE CONFIG ============
+        const firebaseConfig = {
+            apiKey: "AIzaSyBQVwn8vOrFTzLlm2MYIPBwgZV2xR9AuhM",
+            authDomain: "word-boxing.firebaseapp.com",
+            databaseURL: "https://word-boxing-default-rtdb.firebaseio.com",
+            projectId: "word-boxing"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+        
+        // ============ APP STATE ============
+        const APP_VERSION = '1.0.0';
+        let appData = {
+            teacherName: '',
+            classroomName: '',
+            students: [],
+            subjects: ['Math', 'Reading', 'Writing', 'Science', 'Life Skills', 'Social Studies', 'Art', 'Music'],
+            periods: ['Period 1', 'Period 2', 'Period 3', 'Period 4', 'Period 5'],
+            documents: [],
+            setupComplete: false,
+            deviceId: null
+        };
+        
+        const DOC_TYPES = ['Worksheet', 'Quiz', 'Test', 'Homework', 'Project', 'Classwork', 'Assessment', 'Other'];
+        const STUDENT_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'];
+        
+        // Capture state
+        let cameraStream = null;
+        let capturedImageData = null;
+        let detectedStudent = null;
+        let selectedSubject = '';
+        let selectedDocType = '';
+        let selectedPeriod = '';
+        let currentModalDoc = null;
+        
+        // ============ INITIALIZATION ============
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLocalData();
+            initServiceWorker();
+            initAuth();
+        });
+        
+        function initServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed:', err));
+            }
+        }
+        
+        function initAuth() {
+            // Use anonymous auth for simplicity
+            auth.signInAnonymously().catch(e => console.log('Auth error:', e));
+            
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    appData.deviceId = user.uid;
+                    updateSyncStatus('synced', 'Connected');
+                    // Could sync from Firebase here if implementing cloud sync
+                } else {
+                    updateSyncStatus('offline', 'Offline');
+                }
+            });
+        }
+        
+        // ============ DATA MANAGEMENT ============
+        function loadLocalData() {
+            try {
+                const saved = localStorage.getItem('edutrack-data');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    appData = { ...appData, ...data };
+                    
+                    if (appData.setupComplete) {
+                        showScreen('home');
+                        updateHomeScreen();
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load data:', e);
+            }
+        }
+        
+        function saveLocalData() {
+            try {
+                localStorage.setItem('edutrack-data', JSON.stringify(appData));
+            } catch (e) {
+                console.error('Failed to save data:', e);
+            }
+        }
+        
+        // ============ TOAST ============
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+        
+        // ============ SCREEN MANAGEMENT ============
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(`${screenId}-screen`).classList.add('active');
+            
+            if (screenId === 'home') {
+                updateHomeScreen();
+            } else if (screenId === 'config') {
+                updateConfigScreen();
+            } else if (screenId === 'repository') {
+                updateRepositoryScreen();
+            }
+        }
+        
+        // ============ SETUP WIZARD ============
+        function startSetup() {
+            showScreen('setup');
+            renderSubjectsSetup();
+            renderPeriodsSetup();
+        }
+        
+        function goToSetupStep(step) {
+            // Validation
+            if (step === 2) {
+                const teacher = document.getElementById('teacher-name-input').value.trim();
+                const classroom = document.getElementById('classroom-name-input').value.trim();
+                if (!teacher || !classroom) {
+                    showToast('Please fill in both fields', 'error');
+                    return;
+                }
+                appData.teacherName = teacher;
+                appData.classroomName = classroom;
+            } else if (step === 3) {
+                if (appData.students.length === 0) {
+                    showToast('Add at least one student', 'error');
+                    return;
+                }
+            }
+            
+            // Update progress dots
+            for (let i = 1; i <= 3; i++) {
+                document.getElementById(`progress-${i}`).classList.toggle('active', i <= step);
+            }
+            
+            // Show correct step
+            for (let i = 1; i <= 3; i++) {
+                document.getElementById(`setup-step-${i}`).style.display = i === step ? 'block' : 'none';
+            }
+        }
+        
+        function finishSetup() {
+            appData.setupComplete = true;
+            saveLocalData();
+            showScreen('home');
+            showToast('Setup complete! 🎉');
+        }
+        
+        // ============ STUDENT MANAGEMENT ============
+        function generateStudentCode(firstName, lastName) {
+            const initials = (firstName[0] + lastName[0]).toUpperCase();
+            const existingCodes = appData.students.map(s => s.code);
+            let counter = 1;
+            let code = `ET-${initials}-${String(counter).padStart(3, '0')}`;
+            while (existingCodes.includes(code)) {
+                counter++;
+                code = `ET-${initials}-${String(counter).padStart(3, '0')}`;
+            }
+            return code;
+        }
+        
+        function addStudent() {
+            const firstName = document.getElementById('new-first-name').value.trim();
+            const lastName = document.getElementById('new-last-name').value.trim();
+            
+            if (!firstName || !lastName) {
+                showToast('Enter first and last name', 'error');
+                return;
+            }
+            
+            const student = {
+                id: Date.now().toString(),
+                firstName,
+                lastName,
+                code: generateStudentCode(firstName, lastName),
+                color: STUDENT_COLORS[appData.students.length % STUDENT_COLORS.length],
+                createdAt: new Date().toISOString()
+            };
+            
+            appData.students.push(student);
+            saveLocalData();
+            
+            document.getElementById('new-first-name').value = '';
+            document.getElementById('new-last-name').value = '';
+            
+            renderStudentList();
+            showToast(`Added ${firstName} ${lastName}`);
+        }
+        
+        function removeStudent(id) {
+            appData.students = appData.students.filter(s => s.id !== id);
+            saveLocalData();
+            renderStudentList();
+        }
+        
+        function renderStudentList() {
+            const container = document.getElementById('student-list');
+            if (!container) return;
+            
+            container.innerHTML = appData.students.map(s => `
+                <div class="student-card">
+                    <div class="student-dot" style="background: ${s.color}"></div>
+                    <div class="student-info">
+                        <div class="student-name">${s.firstName} ${s.lastName}</div>
+                        <div class="code-display">
+                            <code class="code-text">${s.code}</code>
+                            <button class="copy-btn" onclick="copyCode('${s.code}')">📋</button>
+                        </div>
+                    </div>
+                    <button class="remove-btn" onclick="removeStudent('${s.id}')">×</button>
+                </div>
+            `).join('');
+        }
+        
+        function copyCode(code) {
+            navigator.clipboard.writeText(code);
+            showToast('Code copied!');
+        }
+        
+        // ============ SUBJECTS & PERIODS ============
+        function renderSubjectsSetup() {
+            const container = document.getElementById('subjects-container');
+            container.innerHTML = appData.subjects.map(s => `
+                <span class="editable-chip">
+                    ${s}
+                    <button class="chip-remove" onclick="removeSubject('${s}')">×</button>
+                </span>
+            `).join('');
+        }
+        
+        function renderPeriodsSetup() {
+            const container = document.getElementById('periods-container');
+            container.innerHTML = appData.periods.map(p => `
+                <span class="editable-chip">
+                    ${p}
+                    <button class="chip-remove" onclick="removePeriod('${p}')">×</button>
+                </span>
+            `).join('');
+        }
+        
+        function addSubject(e) {
+            if (e.key === 'Enter' && e.target.value.trim()) {
+                appData.subjects.push(e.target.value.trim());
+                e.target.value = '';
+                saveLocalData();
+                renderSubjectsSetup();
+            }
+        }
+        
+        function addPeriod(e) {
+            if (e.key === 'Enter' && e.target.value.trim()) {
+                appData.periods.push(e.target.value.trim());
+                e.target.value = '';
+                saveLocalData();
+                renderPeriodsSetup();
+            }
+        }
+        
+        function removeSubject(subj) {
+            appData.subjects = appData.subjects.filter(s => s !== subj);
+            saveLocalData();
+            renderSubjectsSetup();
+        }
+        
+        function removePeriod(per) {
+            appData.periods = appData.periods.filter(p => p !== per);
+            saveLocalData();
+            renderPeriodsSetup();
+        }
+        
+        // ============ HOME SCREEN ============
+        function updateHomeScreen() {
+            document.getElementById('home-classroom-name').textContent = appData.classroomName;
+            document.getElementById('home-teacher-name').textContent = appData.teacherName;
+            
+            const today = new Date().toDateString();
+            const todayCount = appData.documents.filter(d => new Date(d.capturedAt).toDateString() === today).length;
+            
+            document.getElementById('stat-today').textContent = todayCount;
+            document.getElementById('stat-total').textContent = appData.documents.length;
+            document.getElementById('stat-students').textContent = appData.students.length;
+            document.getElementById('repo-count').textContent = appData.documents.length;
+            
+            // Recent activity
+            const recentContainer = document.getElementById('recent-activity');
+            const recent = appData.documents.slice(0, 5);
+            
+            if (recent.length === 0) {
+                recentContainer.innerHTML = `
+                    <div class="empty-state">
+                        <p>No documents captured yet</p>
+                        <p class="empty-hint">Tap "Capture Document" to start</p>
+                    </div>
+                `;
+            } else {
+                recentContainer.innerHTML = recent.map(d => `
+                    <div class="activity-card" onclick="viewDocument('${d.id}')">
+                        <div class="student-dot" style="background: ${d.studentColor}"></div>
+                        <div class="activity-info">
+                            <div class="activity-name">${d.studentName}</div>
+                            <div class="activity-meta">${d.subject} • ${d.docType}</div>
+                        </div>
+                        <div class="activity-time">${new Date(d.capturedAt).toLocaleDateString()}</div>
+                    </div>
+                `).join('');
+            }
+            
+            // Student codes
+            const codesContainer = document.getElementById('student-codes');
+            codesContainer.innerHTML = appData.students.map(s => `
+                <div class="code-card" onclick="copyCode('${s.code}')">
+                    <div class="student-dot" style="background: ${s.color}"></div>
+                    <div class="code-card-info">
+                        <div class="code-card-name">${s.firstName} ${s.lastName[0]}.</div>
+                        <code class="code-card-code">${s.code}</code>
+                    </div>
+                    <span class="copy-icon">📋</span>
+                </div>
+            `).join('');
+        }
+        
+        // ============ CONFIG SCREEN ============
+        function updateConfigScreen() {
+            document.getElementById('config-teacher-name').value = appData.teacherName;
+            document.getElementById('config-classroom-name').value = appData.classroomName;
+            
+            // Student list
+            const container = document.getElementById('config-student-list');
+            container.innerHTML = appData.students.map(s => `
+                <div class="config-student-card">
+                    <div class="student-dot" style="background: ${s.color}"></div>
+                    <div class="student-info">
+                        <div>${s.firstName} ${s.lastName}</div>
+                        <code class="student-code">${s.code}</code>
+                    </div>
+                    <button class="copy-btn" onclick="copyCode('${s.code}')">📋</button>
+                    <button class="remove-btn" onclick="removeStudentFromConfig('${s.id}')">×</button>
+                </div>
+            `).join('');
+            
+            // Subjects
+            document.getElementById('config-subjects').innerHTML = appData.subjects.map(s => `
+                <span class="editable-chip">
+                    ${s}
+                    <button class="chip-remove" onclick="removeSubjectFromConfig('${s}')">×</button>
+                </span>
+            `).join('');
+            
+            // Periods
+            document.getElementById('config-periods').innerHTML = appData.periods.map(p => `
+                <span class="editable-chip">
+                    ${p}
+                    <button class="chip-remove" onclick="removePeriodFromConfig('${p}')">×</button>
+                </span>
+            `).join('');
+        }
+        
+        function updateConfig() {
+            appData.teacherName = document.getElementById('config-teacher-name').value;
+            appData.classroomName = document.getElementById('config-classroom-name').value;
+            saveLocalData();
+        }
+        
+        function addStudentFromConfig() {
+            const firstName = document.getElementById('config-new-first').value.trim();
+            const lastName = document.getElementById('config-new-last').value.trim();
+            
+            if (!firstName || !lastName) {
+                showToast('Enter first and last name', 'error');
+                return;
+            }
+            
+            const student = {
+                id: Date.now().toString(),
+                firstName,
+                lastName,
+                code: generateStudentCode(firstName, lastName),
+                color: STUDENT_COLORS[appData.students.length % STUDENT_COLORS.length],
+                createdAt: new Date().toISOString()
+            };
+            
+            appData.students.push(student);
+            saveLocalData();
+            
+            document.getElementById('config-new-first').value = '';
+            document.getElementById('config-new-last').value = '';
+            
+            updateConfigScreen();
+            showToast(`Added ${firstName} ${lastName}`);
+        }
+        
+        function removeStudentFromConfig(id) {
+            appData.students = appData.students.filter(s => s.id !== id);
+            saveLocalData();
+            updateConfigScreen();
+        }
+        
+        function addSubjectFromConfig(e) {
+            if (e.key === 'Enter' && e.target.value.trim()) {
+                appData.subjects.push(e.target.value.trim());
+                e.target.value = '';
+                saveLocalData();
+                updateConfigScreen();
+            }
+        }
+        
+        function addPeriodFromConfig(e) {
+            if (e.key === 'Enter' && e.target.value.trim()) {
+                appData.periods.push(e.target.value.trim());
+                e.target.value = '';
+                saveLocalData();
+                updateConfigScreen();
+            }
+        }
+        
+        function removeSubjectFromConfig(subj) {
+            appData.subjects = appData.subjects.filter(s => s !== subj);
+            saveLocalData();
+            updateConfigScreen();
+        }
+        
+        function removePeriodFromConfig(per) {
+            appData.periods = appData.periods.filter(p => p !== per);
+            saveLocalData();
+            updateConfigScreen();
+        }
+        
+        function updateSyncStatus(status, text) {
+            const dot = document.getElementById('sync-dot');
+            const statusText = document.getElementById('sync-status-text');
+            if (dot && statusText) {
+                dot.className = `sync-dot ${status}`;
+                statusText.textContent = text;
+            }
+        }
+        
+        function resetAllData() {
+            if (confirm('This will delete ALL data including students and documents. Are you sure?')) {
+                localStorage.removeItem('edutrack-data');
+                location.reload();
+            }
+        }
+        
+        // ============ CAPTURE ============
+        function startCapture() {
+            // Reset state
+            capturedImageData = null;
+            detectedStudent = null;
+            selectedSubject = '';
+            selectedDocType = '';
+            selectedPeriod = '';
+            
+            document.getElementById('camera-view').style.display = 'flex';
+            document.getElementById('review-view').style.display = 'none';
+            
+            showScreen('capture');
+            startCamera();
+        }
+        
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+                });
+                cameraStream = stream;
+                const video = document.getElementById('camera-video');
+                video.srcObject = stream;
+                video.play();
+            } catch (err) {
+                showToast('Camera access denied', 'error');
+                console.error(err);
+            }
+        }
+        
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+        }
+        
+        function capturePhoto() {
+            const video = document.getElementById('camera-video');
+            const canvas = document.getElementById('capture-canvas');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            capturedImageData = canvas.toDataURL('image/jpeg', 0.85);
+            stopCamera();
+            
+            // Show review
+            document.getElementById('camera-view').style.display = 'none';
+            document.getElementById('review-view').style.display = 'block';
+            document.getElementById('preview-image').src = capturedImageData;
+            
+            // Populate selects
+            populateCaptureForm();
+            
+            // Run OCR
+            runOCR();
+        }
+        
+        function populateCaptureForm() {
+            // Student select
+            const studentSelect = document.getElementById('student-select');
+            studentSelect.innerHTML = '<option value="">Select student...</option>' +
+                appData.students.map(s => `<option value="${s.id}">${s.firstName} ${s.lastName} (${s.code})</option>`).join('');
+            
+            // Subject chips
+            document.getElementById('subject-chips').innerHTML = appData.subjects.map(s => 
+                `<button class="chip" data-subject="${s}" onclick="selectSubject('${s}')">${s}</button>`
+            ).join('');
+            
+            // Doc type chips
+            document.getElementById('doctype-chips').innerHTML = DOC_TYPES.map(t => 
+                `<button class="chip" data-doctype="${t}" onclick="selectDocType('${t}')">${t}</button>`
+            ).join('');
+            
+            // Period chips
+            document.getElementById('period-chips').innerHTML = appData.periods.map(p => 
+                `<button class="chip" data-period="${p}" onclick="selectPeriod('${p}')">${p}</button>`
+            ).join('');
+        }
+        
+        function selectSubject(subj) {
+            selectedSubject = subj;
+            document.querySelectorAll('[data-subject]').forEach(el => {
+                el.classList.toggle('active', el.dataset.subject === subj);
+            });
+        }
+        
+        function selectDocType(type) {
+            selectedDocType = type;
+            document.querySelectorAll('[data-doctype]').forEach(el => {
+                el.classList.toggle('active', el.dataset.doctype === type);
+            });
+        }
+        
+        function selectPeriod(per) {
+            selectedPeriod = selectedPeriod === per ? '' : per;
+            document.querySelectorAll('[data-period]').forEach(el => {
+                el.classList.toggle('active', el.dataset.period === selectedPeriod);
+            });
+        }
+        
+        async function runOCR() {
+            document.getElementById('ocr-overlay').style.display = 'flex';
+            document.getElementById('detected-banner').style.display = 'none';
+            document.getElementById('warning-banner').style.display = 'none';
+            
+            try {
+                const result = await Tesseract.recognize(capturedImageData, 'eng');
+                const text = result.data.text;
+                
+                // Look for student codes
+                const codePattern = /ET-[A-Z]{2}-\d{3}/g;
+                const matches = text.match(codePattern);
+                
+                if (matches && matches.length > 0) {
+                    const foundCode = matches[0];
+                    const student = appData.students.find(s => s.code === foundCode);
+                    
+                    if (student) {
+                        detectedStudent = student;
+                        document.getElementById('detected-banner').style.display = 'flex';
+                        document.getElementById('detected-name').textContent = `${student.firstName} ${student.lastName}`;
+                        document.getElementById('student-select').value = student.id;
+                        showToast(`Detected: ${student.firstName} ${student.lastName}`);
+                    } else {
+                        document.getElementById('warning-banner').style.display = 'flex';
+                        showToast('Code found but no matching student', 'warning');
+                    }
+                } else {
+                    document.getElementById('warning-banner').style.display = 'flex';
+                    showToast('No code detected - select manually', 'warning');
+                }
+            } catch (err) {
+                console.error('OCR error:', err);
+                document.getElementById('warning-banner').style.display = 'flex';
+                showToast('OCR failed - select manually', 'warning');
+            }
+            
+            document.getElementById('ocr-overlay').style.display = 'none';
+        }
+        
+        function retakePhoto() {
+            document.getElementById('camera-view').style.display = 'flex';
+            document.getElementById('review-view').style.display = 'none';
+            startCamera();
+        }
+        
+        function cancelCapture() {
+            stopCamera();
+            showScreen('home');
+        }
+        
+        function saveDocument() {
+            const studentId = document.getElementById('student-select').value;
+            const student = appData.students.find(s => s.id === studentId);
+            
+            if (!student) {
+                showToast('Please select a student', 'error');
+                return;
+            }
+            if (!selectedSubject) {
+                showToast('Please select a subject', 'error');
+                return;
+            }
+            if (!selectedDocType) {
+                showToast('Please select document type', 'error');
+                return;
+            }
+            
+            const doc = {
+                id: Date.now().toString(),
+                studentId: student.id,
+                studentName: `${student.firstName} ${student.lastName}`,
+                studentCode: student.code,
+                studentColor: student.color,
+                subject: selectedSubject,
+                docType: selectedDocType,
+                period: selectedPeriod || 'Unspecified',
+                notes: document.getElementById('doc-notes').value,
+                image: capturedImageData,
+                capturedAt: new Date().toISOString()
+            };
+            
+            appData.documents.unshift(doc);
+            saveLocalData();
+            
+            showToast(`✓ Saved: ${student.firstName} - ${selectedSubject}`);
+            showScreen('home');
+        }
+        
+        // ============ REPOSITORY ============
+        function updateRepositoryScreen() {
+            // Populate filter dropdowns
+            document.getElementById('filter-student').innerHTML = '<option value="all">All Students</option>' +
+                appData.students.map(s => `<option value="${s.id}">${s.firstName} ${s.lastName}</option>`).join('');
+            
+            document.getElementById('filter-subject').innerHTML = '<option value="all">All Subjects</option>' +
+                appData.subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+            
+            document.getElementById('filter-period').innerHTML = '<option value="all">All Periods</option>' +
+                appData.periods.map(p => `<option value="${p}">${p}</option>`).join('');
+            
+            filterDocuments();
+        }
+        
+        function filterDocuments() {
+            const studentFilter = document.getElementById('filter-student').value;
+            const subjectFilter = document.getElementById('filter-subject').value;
+            const periodFilter = document.getElementById('filter-period').value;
+            const dateFrom = document.getElementById('filter-date-from').value;
+            const dateTo = document.getElementById('filter-date-to').value;
+            const searchText = document.getElementById('search-text').value.toLowerCase();
+            
+            const filtered = appData.documents.filter(doc => {
+                if (studentFilter !== 'all' && doc.studentId !== studentFilter) return false;
+                if (subjectFilter !== 'all' && doc.subject !== subjectFilter) return false;
+                if (periodFilter !== 'all' && doc.period !== periodFilter) return false;
+                if (dateFrom && new Date(doc.capturedAt) < new Date(dateFrom)) return false;
+                if (dateTo && new Date(doc.capturedAt) > new Date(dateTo + 'T23:59:59')) return false;
+                if (searchText && !doc.studentName.toLowerCase().includes(searchText) && 
+                    !(doc.notes && doc.notes.toLowerCase().includes(searchText))) return false;
+                return true;
+            });
+            
+            document.getElementById('result-count').textContent = filtered.length;
+            
+            const container = document.getElementById('doc-list');
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No documents match your filters</p></div>';
+            } else {
+                container.innerHTML = filtered.map(doc => `
+                    <div class="doc-card" onclick="viewDocument('${doc.id}')">
+                        <img src="${doc.image}" class="doc-thumb" alt="">
+                        <div class="doc-info">
+                            <div class="doc-header">
+                                <div class="student-dot" style="background: ${doc.studentColor}"></div>
+                                <span class="doc-name">${doc.studentName}</span>
+                            </div>
+                            <div class="doc-meta">${doc.subject} • ${doc.docType} • ${doc.period}</div>
+                            <div class="doc-date">${new Date(doc.capturedAt).toLocaleDateString()} at ${new Date(doc.capturedAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</div>
+                            ${doc.notes ? `<div class="doc-notes">📝 ${doc.notes}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function viewDocument(id) {
+            const doc = appData.documents.find(d => d.id === id);
+            if (!doc) return;
+            
+            currentModalDoc = doc;
+            
+            document.getElementById('modal-image').src = doc.image;
+            document.getElementById('modal-dot').style.background = doc.studentColor;
+            document.getElementById('modal-name').textContent = doc.studentName;
+            document.getElementById('modal-code').textContent = doc.studentCode;
+            document.getElementById('modal-subject').textContent = doc.subject;
+            document.getElementById('modal-doctype').textContent = doc.docType;
+            document.getElementById('modal-period').textContent = doc.period;
+            document.getElementById('modal-date').textContent = new Date(doc.capturedAt).toLocaleString();
+            
+            if (doc.notes) {
+                document.getElementById('modal-notes-row').style.display = 'flex';
+                document.getElementById('modal-notes').textContent = doc.notes;
+            } else {
+                document.getElementById('modal-notes-row').style.display = 'none';
+            }
+            
+            document.getElementById('doc-modal').classList.add('active');
+        }
+        
+        function closeDocModal() {
+            document.getElementById('doc-modal').classList.remove('active');
+            currentModalDoc = null;
+        }
+        
+        function deleteDocument() {
+            if (!currentModalDoc) return;
+            
+            if (confirm('Delete this document?')) {
+                appData.documents = appData.documents.filter(d => d.id !== currentModalDoc.id);
+                saveLocalData();
+                closeDocModal();
+                filterDocuments();
+                showToast('Document deleted');
+            }
+        }
+    </script>
+</body>
+</html>

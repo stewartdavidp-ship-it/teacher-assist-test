@@ -1,0 +1,53 @@
+{
+  "name": "EduTrack",
+  "short_name": "EduTrack",
+  "description": "Document tracking for special education teachers",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#1a1a2e",
+  "theme_color": "#4ECDC4",
+  "orientation": "portrait-primary",
+  "scope": "./",
+  "lang": "en-US",
+  
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  
+  "shortcuts": [
+    {
+      "name": "Capture Document",
+      "short_name": "Capture",
+      "description": "Quickly capture a student document",
+      "url": "./index.html?action=capture"
+    }
+  ],
+  
+  "launch_handler": {
+    "client_mode": ["focus-existing", "auto"]
+  }
+}

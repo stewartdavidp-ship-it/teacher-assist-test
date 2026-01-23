@@ -1,0 +1,32 @@
+# EduTrack v1.0.0 - Initial Release
+
+## Overview
+Document tracking PWA for special education teachers.
+
+## Features
+- **Setup Wizard**: Configure classroom, add students, customize subjects/periods
+- **Student Codes**: Auto-generated ET-XX-### codes for document tracking
+- **Camera Capture**: Take photos of student work
+- **OCR Detection**: Automatically detect student codes using Tesseract.js
+- **Document Repository**: Filter by student, subject, period, date range
+- **Local Storage**: All data persists locally
+- **PWA Support**: Installable, works offline
+
+## Student Code System
+- Format: ET-XX-###
+- Example: ET-SM-001 (Sarah Miller, student 1)
+- Codes are OCR-friendly for automatic detection
+- Copy codes to clipboard for use in document templates
+
+## Using with Gemini/AI Tools
+Teachers can provide student codes to Gemini when generating worksheets:
+"Add the code ET-SM-001 to the top-right corner of this worksheet"
+
+## Technical
+- Firebase anonymous auth (ready for future cloud sync)
+- Tesseract.js for client-side OCR
+- Service worker for offline support
+- Mobile-first responsive design
+
+## Deployment
+Deploy to any static hosting (GitHub Pages, Firebase Hosting, etc.)
